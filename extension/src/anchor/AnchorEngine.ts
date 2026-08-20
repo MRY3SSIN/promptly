@@ -120,6 +120,11 @@ export class AnchorEngine {
     return this.#target;
   }
 
+  /** The composer rect the current placement was computed from. Diagnostics. */
+  get lastTargetBox(): Box | null {
+    return this.#lastTargetBox;
+  }
+
   attach(): void {
     if (this.#attached) return;
     this.#attached = true;

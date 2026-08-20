@@ -138,26 +138,26 @@ describe('solvePlacement', () => {
      * anchoring soak, roughly one run in fifteen — the width of Claude's
      * control row.
      *
-     * The overlap test is a threshold, and the widget rests close to it: a few
-     * pixels of vertical clearance between its bottom edge and the top of the
-     * send button. Any layout change that closes that gap flips the slide on,
-     * and the next one flips it back. A plain threshold makes that a hard
-     * oscillation, so the widget jumps back and forth by the width of the
-     * button row while the geometry jitters across the boundary by a pixel.
+     * The widget rests a few pixels above the top edge of the send button, and
+     * whether it dodges was a bare overlap threshold. Layout noise pushes the
+     * geometry back and forth across that line, and each crossing costs a
+     * ~60px sideways move, so the widget hops between two positions while
+     * nothing the user did has changed.
      *
-     * Walking the composer across the boundary and back is deterministic where
-     * the soak was not, and asserts the property that actually matters: the
-     * position must be monotonic in the geometry, never oscillating.
+     * The test jitters the composer around the crossing point rather than
+     * sweeping past it once: a sweep is satisfied by one transition in each
+     * direction and passes against the broken implementation, which is exactly
+     * the mistake the first version of this test made. Jitter is what the
+     * real failure looks like, and it is deterministic where the soak was not.
      */
-    it('does not oscillate when geometry drifts across the overlap threshold', () => {
+    it('does not chatter when geometry jitters across the overlap threshold', () => {
       const button: Box = { x: 960, y: 640, width: 30, height: 30 };
+      // The widget's lower edge crosses the button's upper edge at dy = 4.5.
+      const jitter = [0, 6, 4, 6, 4, 6, 4, 6, 4, 6];
+
       const positions: number[] = [];
       let slid = false;
-
-      // Creep the composer down so the widget's lower edge crosses the
-      // button's upper edge a fraction of a pixel at a time, then creep back.
-      const steps = [...range(0, 12, 0.5), ...range(12, 0, -0.5)];
-      for (const dy of steps) {
+      for (const dy of jitter) {
         const p = solvePlacement({
           target: { ...COMPOSER, y: 620 + dy }, widget: WIDGET, spec: spec(),
           avoid: [button], slid, clip: VIEWPORT, viewport: VIEWPORT,
@@ -167,7 +167,8 @@ describe('solvePlacement', () => {
       }
 
       const transitions = positions.filter((x, i) => i > 0 && x !== positions[i - 1]).length;
-      expect(transitions).toBeLessThanOrEqual(2);
+      // One move away from the button is correct. Anything more is chatter.
+      expect(transitions, `positions: ${positions.join(', ')}`).toBe(1);
     });
 
     it('holds the slide once engaged, rather than releasing on a one-pixel retreat', () => {

@@ -54,6 +54,22 @@ Then in Chrome:
 Re-run `pnpm build` and hit the reload icon on the extension card after
 changes.
 
+### "I can't see the .output folder"
+
+It is there — `pnpm build` prints every file it wrote. The name starts with a
+dot, so macOS Finder and the file picker hide it by default.
+
+Any of these gets you in:
+
+- In the Load unpacked dialog, press **Cmd+Shift+G** and paste the full path,
+  e.g. `/Volumes/External/Apps/promptly/extension/.output/chrome-mv3`
+- Press **Cmd+Shift+.** in Finder or in the file dialog to show hidden files
+  (press again to re-hide)
+- From the terminal: `open extension/.output/chrome-mv3` reveals it in Finder,
+  and you can drag it onto the Chrome dialog
+
+On Linux the equivalent toggle is **Ctrl+H**.
+
 ## 4. See it working
 
 Go to **claude.ai** and click into the message box.

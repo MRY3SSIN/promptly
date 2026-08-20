@@ -28,8 +28,22 @@ import {
 export interface DriftReport extends InstrumentReport {
   samples: number;
   visibleSamples: number;
-  /** Largest deviation, in px, from the settled composer-relative offset. */
+  /**
+   * Largest deviation from the settled offset, over samples where the composer
+   * held still for at least one frame. This is the number that must stay
+   * within budget.
+   */
   maxDrift: number;
+  /**
+   * Largest deviation including samples taken while the composer was moving.
+   * Informational: a sample can land between the browser applying a layout
+   * change and the frame that corrects for it, and no such state is ever
+   * painted. Reported so the transient magnitude is visible rather than
+   * silently discarded.
+   */
+  transientMaxDrift: number;
+  /** Samples discarded because the composer moved between them. */
+  movingSamples: number;
   /** Where the drift peaked, for debugging a failure. */
   worst: { dx: number; dy: number } | null;
   /** Full geometry at the drift peak, so a failure is diagnosable. */
@@ -61,6 +75,9 @@ let baselineOffset: { dx: number; dy: number } | null = null;
 let samples = 0;
 let visibleSamples = 0;
 let maxDrift = 0;
+let transientMaxDrift = 0;
+let movingSamples = 0;
+let previousComposer: { x: number; y: number; w: number; h: number } | null = null;
 let worst: { dx: number; dy: number } | null = null;
 let worstDetail: Record<string, unknown> | null = null;
 
@@ -108,6 +125,7 @@ function sample(): void {
     const offset = { dx: h.right - c.right, dy: h.bottom - c.bottom };
     if (!baselineOffset) {
       baselineOffset = offset;
+      previousComposer = { x: c.x, y: c.y, w: c.width, h: c.height };
       return;
     }
 
@@ -115,6 +133,39 @@ function sample(): void {
       Math.abs(offset.dx - baselineOffset.dx),
       Math.abs(offset.dy - baselineOffset.dy),
     );
+
+    /*
+     * Only judge samples where the composer held still since the previous one.
+     *
+     * There is no API for "read the state that was just painted". This sampler
+     * runs in a task after the frame, and a layout change driven from the test
+     * process — a viewport resize, say — can be applied by the browser between
+     * that frame and this task. The sampler then compares a moved composer
+     * against a transform computed for where it used to be, and reports drift
+     * for a frame that was never rendered. Verified directly: at the peak, the
+     * engine's committed placement matched the widget's actual position
+     * exactly, and the only stale value was the composer rect the engine had
+     * measured — it simply had not been told yet.
+     *
+     * Requiring one frame of stillness removes that whole class of false
+     * positive while still catching everything real: a genuine misalignment
+     * persists after the geometry settles, and so does any lag longer than a
+     * frame.
+     */
+    const still =
+      previousComposer !== null &&
+      Math.abs(previousComposer.x - c.x) < 0.5 &&
+      Math.abs(previousComposer.y - c.y) < 0.5 &&
+      Math.abs(previousComposer.w - c.width) < 0.5 &&
+      Math.abs(previousComposer.h - c.height) < 0.5;
+    previousComposer = { x: c.x, y: c.y, w: c.width, h: c.height };
+
+    if (drift > transientMaxDrift) transientMaxDrift = drift;
+    if (!still) {
+      movingSamples += 1;
+      return;
+    }
+
     if (drift > maxDrift) {
       maxDrift = drift;
       worst = offset;
@@ -128,6 +179,21 @@ function sample(): void {
           const r = b.getBoundingClientRect();
           return { label: b.getAttribute('aria-label'), x: round(r.x), y: round(r.y), w: round(r.width), h: round(r.height) };
         }),
+        /*
+         * The composer rect the engine last measured. If this matches the
+         * live composer rect the engine is current and any mismatch is in the
+         * write; if it is stale the engine never measured this state. That
+         * distinction is the whole diagnosis.
+         */
+        engineSawBox: engine?.lastTargetBox
+          ? {
+              x: round(engine.lastTargetBox.x), y: round(engine.lastTargetBox.y),
+              w: round(engine.lastTargetBox.width), h: round(engine.lastTargetBox.height),
+            }
+          : null,
+        enginePlacement: engine
+          ? { x: round(engine.placement.x), y: round(engine.placement.y), slid: engine.placement.slid }
+          : null,
         wrapper: (() => {
           const w = document.querySelector('.composer-wrapper');
           if (!w) return null;
@@ -219,7 +285,10 @@ const harness: Harness = {
   /** Re-take the settled offset — called after the page stops moving. */
   baseline() {
     baselineOffset = null;
+    previousComposer = null;
     maxDrift = 0;
+    transientMaxDrift = 0;
+    movingSamples = 0;
     worst = null;
     worstDetail = null;
   },
@@ -229,6 +298,8 @@ const harness: Harness = {
     samples = 0;
     visibleSamples = 0;
     maxDrift = 0;
+    transientMaxDrift = 0;
+    movingSamples = 0;
     worst = null;
     worstDetail = null;
   },
@@ -239,6 +310,8 @@ const harness: Harness = {
       samples,
       visibleSamples,
       maxDrift,
+      transientMaxDrift,
+      movingSamples,
       worst,
       worstDetail,
       baseline: baselineOffset,

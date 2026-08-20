@@ -148,19 +148,26 @@ export function solvePlacement(input: PlacementInput): Placement {
 /**
  * Move left until we are clear of the site's own controls.
  *
- * Two stages, and the split is the point.
+ * The walk starts from the widget's undisplaced position and steps left past
+ * each zone it would collide with, rightmost first, so a corner holding
+ * several stacked buttons is cleared in one move rather than landing in the
+ * gap between two of them. Starting from the undisplaced position is what
+ * keeps the decision from feeding back on itself: a widget that has already
+ * moved 60px left no longer overlaps the button it moved to avoid, so testing
+ * from where it currently sits would release the slide, re-collide, and
+ * oscillate every frame.
  *
- * *Whether* to dodge is decided against the widget's undisplaced position —
- * where it would sit with no slide at all — with a release margin that applies
- * only once it is already dodging. Testing against the displaced position
- * instead would be a feedback loop: having moved 60px left, the widget no
- * longer overlaps the button, so it would move back, overlap again, and
- * oscillate every frame. The undisplaced position is a plain function of the
- * composer's rect, so the decision has nowhere to feed back from.
+ * The two geometries in the collision test are deliberately different:
  *
- * *How far* to dodge is then a straightforward walk, rightmost zone first, so
- * a corner holding several stacked buttons is cleared in one move rather than
- * landing in the gap between two of them.
+ *   - the zone is *inflated* to decide whether to dodge, but only once we are
+ *     already dodging, so a widget resting near the edge of a control needs
+ *     real separation to stop rather than releasing on a pixel of jitter;
+ *   - the destination is computed from the *raw* zone, so the resting position
+ *     is identical whether we have just engaged or been engaged for a while.
+ *
+ * Using the inflated zone for both would trade a large oscillation for a small
+ * one — the widget would settle 12px further left while holding than when it
+ * first moved, and hop between the two.
  */
 function slideClearOfAvoidZones(
   x: number,
@@ -172,21 +179,19 @@ function slideClearOfAvoidZones(
   const zones = [...avoid].filter((box) => area(box) > 0).sort((a, b) => b.x - a.x);
   if (zones.length === 0) return { x, slid: false };
 
-  const undisplaced: Box = { x, y, width: widget.width, height: widget.height };
-  // Already dodging: hold on until there is real separation, not a pixel of it.
   const margin = wasSlid ? AVOID_RELEASE_PX : 0;
-  const engaged = zones.some((zone) => overlaps(undisplaced, inflate(zone, margin)));
-  if (!engaged) return { x, slid: false };
-
   let result = x;
+  let slid = false;
+
   for (const zone of zones) {
     const candidate: Box = { x: result, y, width: widget.width, height: widget.height };
-    if (overlaps(candidate, zone)) {
+    if (overlaps(candidate, inflate(zone, margin))) {
       result = zone.x - widget.width - AVOID_GAP_PX;
+      slid = true;
     }
   }
 
-  return { x: result, slid: true };
+  return { x: result, slid };
 }
 
 /** Grow a box by `by` on every side. */
