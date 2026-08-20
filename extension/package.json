@@ -1,0 +1,43 @@
+{
+  "name": "forge-extension",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Forge \u2014 prompt quality analysis and rewriting for AI chat interfaces.",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "zip": "wxt zip",
+    "compile": "tsc --noEmit",
+    "postinstall": "wxt prepare",
+    "icons": "node scripts/make-icons.mjs",
+    "build:harness": "vite build --config tests/e2e/harness/vite.config.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "pretest:e2e": "pnpm run build && pnpm run build:harness",
+    "test:e2e": "playwright test --grep-invert @soak",
+    "test:soak": "playwright test --grep @soak",
+    "check": "pnpm run compile && pnpm run test && pnpm run test:e2e"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^6.1.0",
+    "@wxt-dev/module-react": "^1.2.2",
+    "happy-dom": "^20.11.6",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11",
+    "wxt": "^0.21.4"
+  }
+}

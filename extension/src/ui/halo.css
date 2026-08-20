@@ -1,0 +1,147 @@
+/*
+ * ScoreHalo styling. Every rule here is inside the shadow root, so the naked
+ * element selectors are safe — they cannot reach the host page.
+ */
+
+.forge-halo-root {
+  /*
+   * Exactly the size of the ring, and no larger. The AnchorEngine positions a
+   * box of `HALO_SIZE` square; if this element were wider — because a hover
+   * label participated in its layout — every avoid-zone and viewport-clamp
+   * calculation would be wrong by the difference, and the halo would drift the
+   * moment the pointer arrived.
+   */
+  position: relative;
+  display: block;
+  width: 22px;
+  height: 22px;
+  /*
+   * The host container is `pointer-events: none` so the page underneath stays
+   * fully usable and so our own hit-testing can see through it. Interactive
+   * bits opt back in here.
+   */
+  pointer-events: auto;
+  font-family: var(--forge-font-ui);
+  transition: opacity var(--forge-dur-med) var(--forge-ease);
+}
+
+.forge-halo {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--forge-surface);
+  box-shadow: var(--forge-shadow);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: transform var(--forge-dur-fast) var(--forge-ease);
+}
+
+.forge-halo:hover {
+  transform: scale(1.08);
+}
+
+.forge-halo:focus-visible {
+  outline: 2px solid var(--forge-focus);
+  outline-offset: 2px;
+}
+
+.forge-halo svg {
+  position: absolute;
+  inset: 0;
+}
+
+.forge-halo-track {
+  stroke: var(--forge-track);
+}
+
+.forge-halo-arc {
+  /*
+   * Transitioning the dash array is what makes the ring *fill* as the score
+   * moves rather than snapping between values. Colour rides along with it.
+   */
+  transition:
+    stroke-dasharray var(--forge-dur-med) var(--forge-ease),
+    stroke var(--forge-dur-med) var(--forge-ease);
+}
+
+.forge-halo-arc.is-analyzing {
+  transform-origin: 50% 50%;
+  animation: forge-halo-spin 600ms linear infinite;
+}
+
+.forge-halo-center {
+  position: relative;
+  display: grid;
+  place-items: center;
+  font-family: var(--forge-font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+/*
+ * Absolutely positioned, so it is outside the host's layout box entirely and
+ * cannot change the anchored size. It opens leftward — into the composer,
+ * which is empty space — rather than rightward into the site's own buttons.
+ *
+ * Revealed by clipping rather than by width animation on a laid-out element,
+ * so the text never reflows mid-transition.
+ */
+.forge-halo-label {
+  position: absolute;
+  right: calc(100% + 6px);
+  top: 50%;
+  translate: 0 -50%;
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--forge-text);
+  background: var(--forge-surface);
+  border: 1px solid var(--forge-hairline);
+  border-radius: var(--forge-r-sm);
+  box-shadow: var(--forge-shadow);
+  opacity: 0;
+  padding: 0;
+  transition:
+    max-width var(--forge-dur-med) var(--forge-ease),
+    opacity var(--forge-dur-fast) var(--forge-ease),
+    padding var(--forge-dur-med) var(--forge-ease);
+}
+
+.forge-halo-label.is-open {
+  max-width: 90px;
+  opacity: 1;
+  padding: 3px 7px;
+}
+
+@keyframes forge-halo-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/*
+ * Reduced motion zeroes the duration tokens, but a keyframe animation has to
+ * be stopped explicitly — an infinite spinner is exactly what someone with
+ * vestibular sensitivity turned the setting on to avoid.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .forge-halo-arc.is-analyzing {
+    animation: none;
+  }
+  .forge-halo:hover {
+    transform: none;
+  }
+}

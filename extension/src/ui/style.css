@@ -1,0 +1,17 @@
+/*
+ * The single stylesheet the content-script UI loads. WXT is configured with
+ * `cssInjectionMode: 'ui'`, so this is handed to the shadow root rather than
+ * injected into the host page — Tailwind's preflight included, which is why it
+ * is safe to ship preflight at all.
+ */
+@import 'tailwindcss';
+@import './tokens.css';
+@import './halo.css';
+
+/* Tailwind scans TSX under src/ for class names. */
+@source '../**/*.tsx';
+
+@theme {
+  --font-ui: 'Instrument Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}

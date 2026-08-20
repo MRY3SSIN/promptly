@@ -1,0 +1,106 @@
+/*
+ * Forge design tokens. Scoped to the shadow root — nothing here can reach the
+ * host page, and nothing in the host page's stylesheet can reach in.
+ *
+ * The signature idea: colour encodes prompt state, not brand. One warm pole
+ * (needs work) and one cool pole (ready), and the widget travels between them
+ * as the prompt improves. Everything else stays quiet, because this thing sits
+ * on top of ChatGPT, Claude and Gemini — each with a strong identity of its
+ * own — and it should read as a precision instrument laid over them rather
+ * than a fourth brand competing for attention.
+ */
+
+/*
+ * Bundled, never fetched. A CDN link would be blocked outright by these sites'
+ * CSP and would leak a request per pageview to a third party. Vite inlines
+ * these as data URIs at build time (see `assetsInlineLimit` in wxt.config.ts),
+ * so there is no network at all and no web-accessible resource to declare.
+ * Both faces are variable, so one file covers the whole weight range.
+ */
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('../assets/fonts/instrument-sans-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('../assets/fonts/jetbrains-mono-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:host {
+  /* Poles and surfaces */
+  --forge-ink: #16181a; /* dark surface  */
+  --forge-paper: #fbfaf8; /* light surface */
+  --forge-ochre: #c77b29; /* needs work    */
+  --forge-teal: #0f9b8e; /* ready         */
+  --forge-mute: #8a8f94; /* neutral, idle */
+  --forge-hairline: rgba(138, 143, 148, 0.24);
+
+  /*
+   * Prompt bodies render in mono, UI chrome in Instrument Sans. A prompt is
+   * closer to code than to prose — it is an instruction with structure — and
+   * mono makes a framework's section boundaries legible at a glance.
+   */
+  --forge-font-ui: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --forge-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --forge-r-sm: 6px;
+  --forge-r-md: 10px;
+  --forge-r-lg: 14px;
+  --forge-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.28);
+
+  /* Semantic roles, resolved per theme below. Components read only these. */
+  --forge-surface: var(--forge-paper);
+  --forge-surface-raised: #ffffff;
+  --forge-text: var(--forge-ink);
+  --forge-text-dim: #5f656b;
+  --forge-track: rgba(138, 143, 148, 0.22);
+  --forge-focus: var(--forge-teal);
+
+  /* Motion. Zeroed wholesale under reduced-motion, below. */
+  --forge-dur-fast: 120ms;
+  --forge-dur-med: 200ms;
+  --forge-ease: cubic-bezier(0.2, 0, 0, 1);
+
+  color-scheme: light;
+}
+
+/*
+ * Theme is set explicitly from sampled host-page luminance rather than from
+ * the OS, because these sites theme independently of `prefers-color-scheme` —
+ * a user on a light OS running Claude in dark mode is the common case, not the
+ * edge case. See `theme.ts`.
+ */
+:host([data-forge-theme='dark']) {
+  --forge-surface: var(--forge-ink);
+  --forge-surface-raised: #1f2225;
+  --forge-text: #f2f0ed;
+  --forge-text-dim: #a4aaaf;
+  --forge-hairline: rgba(180, 186, 192, 0.2);
+  --forge-track: rgba(180, 186, 192, 0.18);
+
+  /* Both poles lift slightly on ink so they hold the same perceived weight. */
+  --forge-ochre: #d68d3c;
+  --forge-teal: #23b3a4;
+
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :host {
+    --forge-dur-fast: 0ms;
+    --forge-dur-med: 0ms;
+  }
+}
