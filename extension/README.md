@@ -145,4 +145,16 @@ failure looks like.
 - A pure translation that resizes no ancestor is corrected one frame late, via
   the position sentinel. No pre-paint signal exists for that case, and it is
   why the drift test judges only samples where the composer held still.
-- `writeText` throws by design until M2.
+- **The halo overlaps the end of a long single-line prompt on Claude.**
+  Confirmed against the live site. Claude's `div.ProseMirror` *is* the text
+  line — the `+ / Chat / Cowork / model / mic / send` row is a sibling below it
+  — so the composer's bottom-right corner falls at the end of the user's text
+  rather than in padding. It is the Grammarly pattern, but it bites harder
+  here. Dropping into the control row was tried and reverted in M1: it put the
+  widget on the boundary of the avoid-zone test, which made the position
+  bistable. That is now fixed by the Schmitt trigger, so the placement is worth
+  revisiting in M5 with real measurements of Claude's live layout rather than a
+  third guess at the geometry.
+- Clicking the halo does nothing yet, and the hover label says "Improve"
+  regardless. `content.ts` mounts `ScoreHalo` with no `onOpen`, because there
+  is nothing to open until `IssuePopover` (M3) and `RewritePanel` (M4).
