@@ -77,7 +77,10 @@ test.describe('AnchorEngine', () => {
     const report = await page.evaluate(() => window.__forge.report());
 
     expect(report.visibleSamples).toBeGreaterThan(200);
-    expect(report.maxDrift).toBeLessThanOrEqual(DRIFT_BUDGET_PX);
+    expect(
+      report.maxDrift,
+      `geometry at drift peak: ${JSON.stringify(report.worstDetail)}`,
+    ).toBeLessThanOrEqual(DRIFT_BUDGET_PX);
   });
 
   test('batches every layout read into an animation frame', async ({ page }) => {

@@ -2,6 +2,7 @@ import { resolveAdapter } from '../src/adapters/registry';
 import { ForgeController } from '../src/content/ForgeController';
 import { mountWidget } from '../src/ui/mountWidget';
 import { ScoreHalo } from '../src/ui/ScoreHalo';
+import { widgetStore } from '../src/store/widgetStore';
 import { log } from '../src/util/logger';
 import { createElement } from 'react';
 
@@ -39,6 +40,14 @@ export default defineContentScript({
     const widget = mountWidget(cssText, createElement(ScoreHalo));
     const controller = new ForgeController({ adapter, widget });
     controller.start();
+
+    /*
+     * M1 placeholder. The analyzer arrives in M3; until then the halo shows a
+     * fixed score so the anchoring work is actually visible — an idle ring
+     * with an empty arc is hard to tell apart from a widget that failed to
+     * mount. Delete this block when `analyze()` starts feeding the store.
+     */
+    widgetStore.getState().setScore(64, 3);
 
     log.info(`active on ${adapter.label}`);
   },

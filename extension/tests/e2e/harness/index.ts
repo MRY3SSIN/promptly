@@ -32,6 +32,8 @@ export interface DriftReport extends InstrumentReport {
   maxDrift: number;
   /** Where the drift peaked, for debugging a failure. */
   worst: { dx: number; dy: number } | null;
+  /** Full geometry at the drift peak, so a failure is diagnosable. */
+  worstDetail: Record<string, unknown> | null;
   /** The settled offset every sample is compared against. */
   baseline: { dx: number; dy: number } | null;
   hostCount: number;
@@ -60,6 +62,7 @@ let samples = 0;
 let visibleSamples = 0;
 let maxDrift = 0;
 let worst: { dx: number; dy: number } | null = null;
+let worstDetail: Record<string, unknown> | null = null;
 
 /**
  * Sample what the browser actually painted.
@@ -115,6 +118,23 @@ function sample(): void {
     if (drift > maxDrift) {
       maxDrift = drift;
       worst = offset;
+      const round = (n: number) => Math.round(n);
+      worstDetail = {
+        composer: { x: round(c.x), y: round(c.y), w: round(c.width), h: round(c.height) },
+        host: { x: round(h.x), y: round(h.y) },
+        viewport: { w: window.innerWidth, h: window.innerHeight },
+        sidebar: document.body.classList.contains('sidebar-open'),
+        zones: [...document.querySelectorAll('.controls button')].map((b) => {
+          const r = b.getBoundingClientRect();
+          return { label: b.getAttribute('aria-label'), x: round(r.x), y: round(r.y), w: round(r.width), h: round(r.height) };
+        }),
+        wrapper: (() => {
+          const w = document.querySelector('.composer-wrapper');
+          if (!w) return null;
+          const r = w.getBoundingClientRect();
+          return { x: round(r.x), y: round(r.y), w: round(r.width), h: round(r.height) };
+        })(),
+      };
     }
   });
 }
@@ -201,6 +221,7 @@ const harness: Harness = {
     baselineOffset = null;
     maxDrift = 0;
     worst = null;
+    worstDetail = null;
   },
 
   reset() {
@@ -209,6 +230,7 @@ const harness: Harness = {
     visibleSamples = 0;
     maxDrift = 0;
     worst = null;
+    worstDetail = null;
   },
 
   report() {
@@ -218,6 +240,7 @@ const harness: Harness = {
       visibleSamples,
       maxDrift,
       worst,
+      worstDetail,
       baseline: baselineOffset,
       // The extension's entire footprint: one element, appended to body.
       hostCount: document.querySelectorAll('[data-forge-host]').length,
