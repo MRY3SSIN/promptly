@@ -85,6 +85,18 @@ fixture:
 - **Drift** ≤ 1px from the settled composer-relative offset, over 60 seconds of
   interaction. Measuring the *offset* rather than an absolute position is what
   keeps this from re-implementing the placement solver it is checking.
+
+  Samples are judged only where the composer held still since the previous
+  sample. There is no API for "read the state that was just painted": the
+  sampler runs in a task after the frame, and a layout change driven from the
+  test process can be applied by the browser between that frame and the task,
+  so the sampler compares a moved composer against a transform computed for
+  where it used to be — drift for a frame that was never rendered. That was
+  confirmed directly rather than assumed: at a reported 62px peak, the engine's
+  committed placement matched the widget's actual position exactly, and the
+  only stale value was the composer rect the engine had not been told about
+  yet. The test asserts that most samples survive the gate, so it cannot go
+  vacuous, and logs the transient peak so mid-motion regressions stay visible.
 - **No forced reflow**, checked structurally rather than by scraping Chrome's
   console heuristic: instrumentation counts every `getBoundingClientRect` and
   `getComputedStyle` taken outside a batched flush, and the count must be zero.
@@ -104,6 +116,25 @@ the service worker and the shadow-root mount are exercised as shipped. It also
 asserts the two privacy claims directly: zero network requests while typing,
 and zero nodes injected into the composer's subtree.
 
+### Dodging the site's own controls
+
+`avoidSelectors` keeps the halo off Claude's send and attach buttons. The
+decision is a Schmitt trigger, not a threshold, because engaging it costs a
+~50px sideways move and the halo rests only a few pixels above the button row:
+a bare threshold turns pixel-level layout noise into a visible hop back and
+forth. Two details make it stable — the collision is tested from the widget's
+*undisplaced* position (testing from where it currently sits is a feedback
+loop, since a widget that moved to avoid a button no longer overlaps it), and
+the release margin applies to the decision while the destination is computed
+from the raw zone, so the resting position is the same whether it just engaged
+or has been engaged for a while.
+
+`tests/unit/placement.test.ts` jitters the composer around the crossing point
+and asserts a single transition. An earlier version of that test *swept* across
+the boundary instead, which passes against the broken implementation — a sweep
+is satisfied by one transition in each direction. Jitter is what the real
+failure looks like.
+
 ## Known limits
 
 - Composer selectors are written against the structure in
@@ -112,5 +143,6 @@ and zero nodes injected into the composer's subtree.
   adapter declares an ordered fallback chain, and the weekly selector-drift job
   (M2) is what will make rot visible rather than silent.
 - A pure translation that resizes no ancestor is corrected one frame late, via
-  the position sentinel. No pre-paint signal exists for that case.
+  the position sentinel. No pre-paint signal exists for that case, and it is
+  why the drift test judges only samples where the composer held still.
 - `writeText` throws by design until M2.

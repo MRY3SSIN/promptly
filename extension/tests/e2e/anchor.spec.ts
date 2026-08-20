@@ -76,7 +76,12 @@ test.describe('AnchorEngine', () => {
 
     const report = await page.evaluate(() => window.__forge.report());
 
-    expect(report.visibleSamples).toBeGreaterThan(200);
+    // A stability gate can quietly make this vacuous, so prove that most
+    // samples were actually judged rather than skipped as mid-motion.
+    const judged = report.visibleSamples - report.movingSamples;
+    expect(judged).toBeGreaterThan(200);
+    expect(judged / report.visibleSamples).toBeGreaterThan(0.5);
+
     expect(
       report.maxDrift,
       `geometry at drift peak: ${JSON.stringify(report.worstDetail)}`,
@@ -199,13 +204,24 @@ test.describe('AnchorEngine', () => {
     await aggressiveInteraction(page, 60_000);
 
     const report = await page.evaluate(() => window.__forge.report());
+    const judged = report.visibleSamples - report.movingSamples;
     expect(report.visibleSamples).toBeGreaterThan(1000);
+    expect(judged).toBeGreaterThan(500);
+
     expect(
       report.maxDrift,
       `geometry at drift peak: ${JSON.stringify(report.worstDetail)}`,
     ).toBeLessThanOrEqual(DRIFT_BUDGET_PX);
     expect(report.outOfFrameRectReads).toBe(0);
     expect(report.usedTopLeft).toBe(false);
+
+    // Not an assertion — a record of how far the widget lags mid-motion, so a
+    // regression in transient behaviour is visible in the log rather than
+    // hidden behind the stability gate.
+    console.log(
+      `[soak] judged ${judged}/${report.visibleSamples} still samples · ` +
+        `stable drift ${report.maxDrift}px · transient peak ${report.transientMaxDrift}px`,
+    );
   });
 });
 
