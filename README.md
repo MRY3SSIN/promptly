@@ -27,7 +27,7 @@ web/           marketing, dashboard, Stripe              (M6)
 | Milestone | Scope | State |
 |---|---|---|
 | M1 | Skeleton and anchoring | **done** |
-| M2 | Read and write across four editor engines | not started |
+| M2 | Read and write across four editor engines | **done** |
 | M3 | Local analysis: 12 rules, intent, scoring | not started |
 | M4 | Backend and streaming rewrite | not started |
 | M5 | Clarification, frameworks, polish | not started |

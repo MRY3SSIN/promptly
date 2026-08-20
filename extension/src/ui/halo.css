@@ -145,3 +145,52 @@
     transform: none;
   }
 }
+
+/*
+ * The write-failed toast. Anchored to the halo, so it appears where the user
+ * was already looking rather than in a corner of the screen.
+ */
+.forge-toast {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: 260px;
+  padding: 7px 8px 7px 10px;
+  font-family: var(--forge-font-ui);
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--forge-text);
+  background: var(--forge-surface);
+  border: 1px solid var(--forge-hairline);
+  border-radius: var(--forge-r-md);
+  box-shadow: var(--forge-shadow);
+  pointer-events: auto;
+}
+
+.forge-toast-close {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--forge-r-sm);
+  background: transparent;
+  color: var(--forge-text-dim);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.forge-toast-close:hover {
+  background: var(--forge-track);
+  color: var(--forge-text);
+}
+
+.forge-toast-close:focus-visible {
+  outline: 2px solid var(--forge-focus);
+  outline-offset: 1px;
+}

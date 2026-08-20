@@ -1,8 +1,6 @@
-import {
-  resolveFirst,
-  type SelectorChain,
-  type SiteAdapter,
-} from './types';
+import { readText } from '../io/readText';
+import { writeText } from '../io/writeText';
+import { resolveFirst, type SelectorChain, type SiteAdapter } from './types';
 
 /**
  * claude.ai — ProseMirror.
@@ -51,18 +49,12 @@ export const claudeAdapter: SiteAdapter = {
     return resolveFirst(SUBMIT_SELECTORS);
   },
 
-  /**
-   * ProseMirror renders block children as separate elements, so `innerText`
-   * is the only read that reproduces the user's line breaks. `textContent`
-   * would run every paragraph together.
-   */
   readText(el) {
-    return el.innerText ?? '';
+    return readText(el, 'prosemirror');
   },
 
-  /** Delegated to the shared engine dispatcher in M2. */
-  async writeText() {
-    throw new Error('writeText is implemented in M2');
+  async writeText(el, text) {
+    return (await writeText(el, text, 'prosemirror')).ok;
   },
 
   anchor: {

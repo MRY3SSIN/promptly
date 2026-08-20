@@ -1,0 +1,32 @@
+<!doctype html>
+<!--
+  perplexity.ai, follow-up surface: a Lexical contenteditable. The home page
+  ships a plain textarea instead, which is why the adapter reads the engine off
+  the element — picking textarea for a Lexical editor writes through the
+  prototype value setter, which Lexical ignores, and the write is discarded on
+  the next render with no error anywhere.
+-->
+<html lang="en"><head><meta charset="utf-8"><title>Perplexity fixture</title><style>
+  *{box-sizing:border-box}body{margin:0;height:100vh;display:flex;flex-direction:column;font-family:system-ui}
+  main{flex:1 1 auto;overflow-y:auto;padding:20px}
+  .composer{flex:0 0 auto;padding:12px 20px 24px}
+  .box{max-width:800px;margin:0 auto;position:relative;border:1px solid #e3e3e3;
+    border-radius:12px;padding:14px 56px 14px 16px;background:#fff}
+  [data-lexical-editor]{min-height:24px;outline:none}
+  .actions{position:absolute;right:10px;bottom:10px}
+  .actions button{width:32px;height:32px;border-radius:8px;border:0;background:#20808d;color:#fff}
+</style></head><body>
+  <main><div id="filler"></div></main>
+  <div class="composer"><div class="box">
+    <div contenteditable="true" role="textbox" data-lexical-editor="true"
+         aria-label="Ask follow-up"><p><br></p></div>
+    <div class="actions">
+      <button type="button" data-testid="submit-button" aria-label="Submit">&uarr;</button>
+    </div>
+  </div></div>
+  <script>
+    const f=document.getElementById('filler');
+    for(let i=0;i<25;i++){const d=document.createElement('div');d.style.margin='0 0 24px';
+      d.textContent='Answer '+i+'. '+'Lorem ipsum dolor sit amet. '.repeat(8);f.appendChild(d);}
+  </script>
+</body></html>

@@ -14,6 +14,89 @@ WXT · MV3 · React 18 · TypeScript (strict) · Tailwind · Zustand.
 | `pnpm test:soak` | The 60-second anchoring soak |
 | `pnpm icons` | Regenerate `public/icon/*.png` from the design tokens |
 
+## What M2 established
+
+### writeText — the file that breaks
+
+Every supported editor keeps an internal document tree that is the source of
+truth; the DOM is a rendering of it. Set `innerHTML` and the pixels change, the
+user sees their improved prompt, and the editor's next render throws it away —
+often at the moment they press Enter. The write "worked" right up until it
+mattered.
+
+So every strategy goes through an input path the editor is already listening
+to, and every strategy is **verified by reading the text back a frame later**.
+A write that cannot be verified is escalated, because the alternative is
+telling someone we inserted their prompt when we did not.
+
+The chain, stopping at the first verified success:
+
+1. **engine-specific** — the prototype `value` setter for textareas (React
+   installs its own `value` accessor on the instance, so a plain assignment
+   writes past its bookkeeping), or `execCommand('insertText')` for anything
+   contenteditable
+2. **synthetic paste** — a real `ClipboardEvent` carrying a `DataTransfer`
+3. **`beforeinput` + `input`** with `inputType: 'insertReplacementText'`
+4. **give up honestly** — copy to the clipboard and say so
+
+`execCommand` is deprecated and universally implemented, and it is the only
+route that makes the browser emit a *trusted* `beforeinput` — which is what
+ProseMirror, Lexical and Quill build their transactions from. A synthetic one
+is a different event and these editors check. Do not modernise it.
+
+Two safety properties are enforced rather than assumed:
+
+- **`selectAll` never runs unless focus actually landed in the composer.**
+  It is scoped to the focused editable, so if focus went elsewhere it selects
+  the whole *document* and the `insertText` that follows replaces the page.
+  `tests/e2e/writeText.spec.ts` has a canary element that must survive.
+- **Every synthetic event is `composed: true`**, or it stops at a shadow
+  boundary and never reaches the framework's handler.
+
+### Testing it against editors that fight back
+
+The mocks reproduce the actual hazard: a model plus a re-render loop that
+overwrites the DOM every frame, so a write that never reached the model is gone
+before verification looks. The first version of the unit mock did not re-render,
+every strategy appeared to succeed, and the suite passed while asserting
+nothing — the escalation tests only became meaningful once the mock started
+discarding un-modelled writes.
+
+`execCommand` does not exist in happy-dom, so the browser suite carries the
+strategies themselves while the unit suite carries the chain's control flow.
+
+### Adapters
+
+Five hand-written adapters — Claude, ChatGPT, Gemini, Perplexity, AI Studio —
+each with an ordered selector chain, a saved DOM fixture, and a Playwright test
+asserting the chain resolves, the engine is identified, the submit button is
+found, and text round-trips.
+
+Engine is resolved *per element* where a site ships more than one. Perplexity is
+why: its composer is a textarea on some surfaces and a Lexical contenteditable
+on others, and picking textarea for Lexical writes through the value setter,
+which Lexical ignores — the write is discarded on the next render with no error
+anywhere.
+
+The **generic heuristic adapter is unreachable by URL matching**. It cannot be
+resolved by accident; a caller has to ask for it by name having first checked
+the user enabled it for that exact hostname. A heuristic that guesses which box
+holds your draft is one wrong guess away from destroying it.
+
+### Selector drift
+
+`scripts/check-selectors.mjs` loads each site for real and reports how much of
+each chain is still standing; `.github/workflows/selector-drift.yml` runs it
+weekly. Fixtures are snapshots and cannot notice the real site changed — this is
+the other half.
+
+It fails on invalid CSS and on a chain down to its last match, and treats a
+signed-out page as `unauthenticated` rather than drift, so it does not cry wolf
+every week until people stop reading it. It also fails when *nothing* was
+reachable: unguarded, that exits zero having verified nothing, and a green check
+meaning "I did not look" is worse than no check. Verified against the local
+fixture server in all four states.
+
 ## What M1 established
 
 ### One element, and nothing else

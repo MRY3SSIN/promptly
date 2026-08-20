@@ -27,6 +27,12 @@ export interface WidgetState {
   /** Set when the adapter could not resolve a composer; the UI stays hidden. */
   disabled: boolean;
 
+  /**
+   * Transient message shown near the halo. The only thing that currently
+   * raises one is an exhausted write chain, which must never fail silently.
+   */
+  toast: string | null;
+
   setScore: (score: number, issueCount: number) => void;
   setStatus: (status: HaloStatus) => void;
   setPlaced: (placed: boolean) => void;
@@ -34,6 +40,7 @@ export interface WidgetState {
   setTyping: (typing: boolean) => void;
   setTheme: (theme: Theme) => void;
   setDisabled: (disabled: boolean) => void;
+  setToast: (toast: string | null) => void;
 }
 
 export const useWidgetStore = create<WidgetState>((set) => ({
@@ -45,6 +52,7 @@ export const useWidgetStore = create<WidgetState>((set) => ({
   typing: false,
   theme: 'light',
   disabled: false,
+  toast: null,
 
   setScore: (score, issueCount) =>
     set({
@@ -58,6 +66,7 @@ export const useWidgetStore = create<WidgetState>((set) => ({
   setTyping: (typing) => set({ typing }),
   setTheme: (theme) => set({ theme }),
   setDisabled: (disabled) => set({ disabled }),
+  setToast: (toast) => set({ toast }),
 }));
 
 /** Non-React readers (the anchor controller) use the vanilla API. */

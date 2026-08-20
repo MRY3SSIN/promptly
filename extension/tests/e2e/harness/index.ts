@@ -1,5 +1,10 @@
 import { createElement } from 'react';
+import { detectEngine, type EditorEngine } from '../../../src/adapters/types';
+import { readText } from '../../../src/io/readText';
+import { writeText, type WriteResult } from '../../../src/io/writeText';
 import { claudeAdapter } from '../../../src/adapters/claude';
+import { listAdapters, resolveAdapter } from '../../../src/adapters/registry';
+import { engineFor } from '../../../src/adapters/types';
 import { AnchorEngine } from '../../../src/anchor/AnchorEngine';
 import { layoutBatcher } from '../../../src/anchor/LayoutBatcher';
 import { HALO_SIZE } from '../../../src/config/constants';
@@ -340,10 +345,77 @@ const harness: Harness = {
   },
 };
 
+/**
+ * The IO surface, exposed separately so the write tests can drive the real
+ * shipped `writeText` against the mock editors without mounting a widget.
+ */
+const io = {
+  async write(selector: string, text: string, engine?: EditorEngine) {
+    const el = document.querySelector<HTMLElement>(selector);
+    if (!el) throw new Error(`no element for ${selector}`);
+    let fellBack = false;
+    const result: WriteResult = await writeText(el, text, engine ?? detectEngine(el), {
+      onFallback: () => {
+        fellBack = true;
+      },
+    });
+    return { ...result, fellBack };
+  },
+  read(selector: string, engine?: EditorEngine) {
+    const el = document.querySelector<HTMLElement>(selector);
+    if (!el) throw new Error(`no element for ${selector}`);
+    return readText(el, engine ?? detectEngine(el));
+  },
+  engineOf(selector: string) {
+    const el = document.querySelector<HTMLElement>(selector);
+    return el ? detectEngine(el) : null;
+  },
+};
+
+/**
+ * Adapter surface for the per-site fixture tests. Each supported site gets one
+ * saved DOM snapshot and an assertion that its adapter resolves a composer in
+ * it — the cheapest possible early warning that a redesign has moved the
+ * markup out from under us.
+ */
+const adapters = {
+  idFor(href: string): string | null {
+    return resolveAdapter(new URL(href))?.id ?? null;
+  },
+  probe(id: string) {
+    const adapter = listAdapters().find((a) => a.id === id);
+    if (!adapter) return { found: false, reason: 'no such adapter' as const };
+
+    const composer = adapter.getComposer();
+    if (!composer) return { found: false, reason: 'no composer' as const };
+
+    return {
+      found: true as const,
+      tag: composer.tagName,
+      elementId: composer.id || null,
+      className: composer.className || null,
+      engine: engineFor(adapter, composer),
+      submit: adapter.getSubmitButton?.()?.getAttribute('aria-label') ?? null,
+    };
+  },
+  async roundTrip(id: string, text: string) {
+    const adapter = listAdapters().find((a) => a.id === id);
+    const composer = adapter?.getComposer();
+    if (!adapter || !composer) return { ok: false, read: null as string | null };
+
+    const ok = await adapter.writeText(composer, text);
+    return { ok, read: adapter.readText(composer) };
+  },
+};
+
 declare global {
   interface Window {
     __forge: Harness;
+    __forgeIO: typeof io;
+    __forgeAdapters: typeof adapters;
   }
 }
 
 window.__forge = harness;
+window.__forgeIO = io;
+window.__forgeAdapters = adapters;

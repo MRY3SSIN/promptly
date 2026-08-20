@@ -40,7 +40,20 @@ export interface SiteAdapter {
    */
   getComposer(): HTMLElement | null;
 
+  /**
+   * The editor backing this site's composer, which picks the write strategy.
+   * For sites that only ever ship one, this is the whole answer.
+   */
   engine: EditorEngine;
+
+  /**
+   * Resolve the engine from the live element, for sites that ship more than
+   * one. Perplexity is the reason this exists: its composer is a plain
+   * textarea on some surfaces and a Lexical contenteditable on others, and
+   * picking the wrong strategy there means a write that silently reverts on
+   * the editor's next render.
+   */
+  resolveEngine?(el: HTMLElement): EditorEngine;
 
   readText(el: HTMLElement): string;
 
@@ -53,6 +66,34 @@ export interface SiteAdapter {
    * can close our panels. We never click it and never intercept its events.
    */
   getSubmitButton?(): HTMLElement | null;
+}
+
+/** The engine for this element, honouring a runtime detector if the adapter has one. */
+export function engineFor(adapter: SiteAdapter, el: HTMLElement): EditorEngine {
+  try {
+    return adapter.resolveEngine?.(el) ?? adapter.engine;
+  } catch {
+    return adapter.engine;
+  }
+}
+
+/**
+ * Structural engine detection, for adapters that cannot know statically.
+ *
+ * Reads only what the editor itself puts in the DOM — the marker classes and
+ * attributes each framework sets on its root — never the page's own class
+ * names, which change with every redesign.
+ */
+export function detectEngine(el: HTMLElement): EditorEngine {
+  const tag = el.tagName;
+  if (tag === 'TEXTAREA' || tag === 'INPUT') return 'textarea';
+  if (!el.isContentEditable) return 'unknown';
+
+  if (el.dataset.lexicalEditor === 'true' || el.closest('[data-lexical-editor]')) return 'lexical';
+  if (el.classList.contains('ProseMirror')) return 'prosemirror';
+  if (el.classList.contains('ql-editor') || el.closest('.ql-container')) return 'quill';
+
+  return 'unknown';
 }
 
 /**

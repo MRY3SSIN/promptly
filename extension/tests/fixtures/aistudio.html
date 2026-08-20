@@ -1,0 +1,23 @@
+<!doctype html>
+<!-- aistudio.google.com — a plain textarea, and the simplest site we support. -->
+<html lang="en"><head><meta charset="utf-8"><title>AI Studio fixture</title><style>
+  *{box-sizing:border-box}body{margin:0;height:100vh;display:flex;flex-direction:column;font-family:system-ui}
+  .chat{flex:1 1 auto;overflow-y:auto;padding:20px}
+  .footer{flex:0 0 auto;padding:12px 20px 24px}
+  .wrapper{max-width:900px;margin:0 auto;position:relative;border:1px solid #dadce0;
+    border-radius:12px;padding:12px 60px 12px 14px;background:#fff}
+  textarea{width:100%;border:0;outline:none;resize:none;min-height:24px;font:inherit}
+  run-button{position:absolute;right:10px;bottom:10px}
+  run-button button{height:32px;padding:0 12px;border-radius:8px;border:0;background:#1a73e8;color:#fff}
+</style></head><body>
+  <div class="chat"><div id="filler"></div></div>
+  <div class="footer"><ms-prompt-input-wrapper><div class="wrapper">
+    <textarea aria-label="Type something or pick one from prompt gallery" rows="1"></textarea>
+    <run-button><button type="button" aria-label="Run">Run</button></run-button>
+  </div></ms-prompt-input-wrapper></div>
+  <script>
+    const f=document.getElementById('filler');
+    for(let i=0;i<25;i++){const d=document.createElement('div');d.style.margin='0 0 24px';
+      d.textContent='Message '+i+'. '+'Lorem ipsum dolor sit amet. '.repeat(8);f.appendChild(d);}
+  </script>
+</body></html>

@@ -1,0 +1,54 @@
+# Weekly check that our composer selectors still match the live sites.
+#
+# The fixture tests in `pnpm test:e2e` verify the adapters against saved DOM
+# snapshots, which is exactly what makes them deterministic — and exactly why
+# they cannot notice that the real site has changed. This job is the other half:
+# it loads each site for real and reports how much of each selector chain is
+# still standing.
+name: selector drift
+
+on:
+  schedule:
+    # Mondays, 07:00 UTC — early enough in the week to fix before it matters.
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: extension/pnpm-lock.yaml
+
+      - name: Install
+        working-directory: extension
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        working-directory: extension
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Check selectors
+        working-directory: extension
+        run: node scripts/check-selectors.mjs
+
+      - name: Save report
+        if: always()
+        working-directory: extension
+        run: node scripts/check-selectors.mjs --json > selector-report.json || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: selector-report
+          path: extension/selector-report.json

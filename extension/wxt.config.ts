@@ -31,7 +31,14 @@ export default defineConfig({
      * domains are requested through `optional_host_permissions` at the moment
      * the user enables them, never up front.
      */
-    host_permissions: ['https://claude.ai/*'],
+    host_permissions: [
+      'https://claude.ai/*',
+      'https://chatgpt.com/*',
+      'https://chat.openai.com/*',
+      'https://gemini.google.com/*',
+      'https://*.perplexity.ai/*',
+      'https://aistudio.google.com/*',
+    ],
     optional_host_permissions: ['https://*/*'],
 
     commands: {

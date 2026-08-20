@@ -19,7 +19,8 @@
     "pretest:e2e": "pnpm run build && pnpm run build:harness",
     "test:e2e": "playwright test --grep-invert @soak",
     "test:soak": "playwright test --grep @soak",
-    "check": "pnpm run compile && pnpm run test && pnpm run test:e2e"
+    "check": "pnpm run compile && pnpm run test && pnpm run test:e2e",
+    "selectors": "node scripts/check-selectors.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

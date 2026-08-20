@@ -1,0 +1,34 @@
+<!doctype html>
+<!--
+  gemini.google.com. Quill inside Angular: the editable is a `.ql-editor`
+  nested in Google's own <rich-textarea> component. Angular re-renders this
+  subtree on its own schedule, which is why the anchor engine re-resolves the
+  composer rather than holding a reference.
+-->
+<html lang="en"><head><meta charset="utf-8"><title>Gemini fixture</title><style>
+  *{box-sizing:border-box}body{margin:0;height:100vh;display:flex;flex-direction:column;font-family:system-ui}
+  .conversation{flex:1 1 auto;overflow-y:auto;padding:20px}
+  .input-area{flex:0 0 auto;padding:12px 20px 24px}
+  .input-container{max-width:760px;margin:0 auto;position:relative;
+    border:1px solid #dadce0;border-radius:28px;padding:14px 100px 14px 20px;background:#fff}
+  .ql-editor{min-height:24px;outline:none;max-height:220px;overflow-y:auto}
+  .trailing-actions{position:absolute;right:12px;bottom:10px;display:flex;gap:8px}
+  .trailing-actions button{width:32px;height:32px;border-radius:16px;border:0;background:#e8eaed}
+</style></head><body>
+  <div class="conversation"><div id="filler"></div></div>
+  <div class="input-area"><div class="input-container">
+    <rich-textarea>
+      <div class="ql-editor ql-blank" contenteditable="true" role="textbox"
+           aria-label="Enter a prompt here" data-placeholder="Enter a prompt here"><p><br></p></div>
+    </rich-textarea>
+    <div class="trailing-actions">
+      <uploader-button><button type="button" aria-label="Add image">+</button></uploader-button>
+      <button type="button" class="send-button" aria-label="Send message">&uarr;</button>
+    </div>
+  </div></div>
+  <script>
+    const f=document.getElementById('filler');
+    for(let i=0;i<30;i++){const d=document.createElement('div');d.style.margin='0 0 24px';
+      d.textContent='Response '+i+'. '+'Lorem ipsum dolor sit amet. '.repeat(8);f.appendChild(d);}
+  </script>
+</body></html>

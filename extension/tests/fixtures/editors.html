@@ -1,0 +1,129 @@
+<!doctype html>
+<!--
+  Mock editors that behave the way the real ones do.
+
+  The point of these is the failure mode that makes writeText hard: a framework
+  editor keeps its own document as the source of truth and re-renders the DOM
+  from it every frame. Anything poked straight into the DOM looks right for one
+  frame and is then discarded — which is why a write has to reach the model and
+  why verification has to wait a frame before believing anything.
+
+  Each editor here opts into exactly one input path, so the fallback chain can
+  be walked one rung at a time.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Editor fixtures</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 20px; }
+      .editor { border: 1px solid #ccc; border-radius: 8px; padding: 8px; min-height: 40px; margin: 0 0 16px; }
+      h2 { font-size: 13px; margin: 0 0 4px; color: #666; font-weight: 500; }
+      #canary { padding: 8px; background: #ffe; border: 1px solid #dd8; }
+    </style>
+  </head>
+  <body>
+    <!--
+      Guard against the worst possible bug in this file. `execCommand('selectAll')`
+      is scoped to the focused editable — but if focus never landed, it selects
+      the whole document and the `insertText` that follows replaces the page.
+      This element must survive every test.
+    -->
+    <p id="canary">canary-text-must-survive</p>
+
+    <h2>prosemirror-like — syncs its model from the DOM, but only after a trusted beforeinput</h2>
+    <div id="prosemirror" class="editor" contenteditable="true" role="textbox"></div>
+
+    <h2>paste-only — ignores keyboard input entirely</h2>
+    <div id="paste-only" class="editor" contenteditable="true" role="textbox"></div>
+
+    <h2>react-textarea — tracks value on the instance, like React</h2>
+    <textarea id="react-textarea" class="editor"></textarea>
+
+    <h2>stubborn — accepts nothing; forces the clipboard fallback</h2>
+    <div id="stubborn" class="editor" contenteditable="true" role="textbox"></div>
+
+    <h2>unfocusable — refuses focus, so the selectAll guard must refuse to run</h2>
+    <div id="unfocusable-wrap"><div id="unfocusable" class="editor" contenteditable="true"></div></div>
+
+    <script>
+      // Every editor exposes its model at window.__models[id] so a test can
+      // assert on what the editor *believes*, not merely what is painted.
+      window.__models = {};
+
+      function render(el, doc) {
+        if (el.tagName === 'TEXTAREA') {
+          el.value = doc;
+          return;
+        }
+        el.innerHTML = '';
+        for (const line of doc.split('\n')) {
+          const p = document.createElement('div');
+          if (line === '') p.appendChild(document.createElement('br'));
+          else p.textContent = line;
+          el.appendChild(p);
+        }
+      }
+
+      function install(id, opts) {
+        const el = document.getElementById(id);
+        const model = { doc: '', accepted: [] };
+        window.__models[id] = model;
+
+        let sawTrusted = false;
+
+        el.addEventListener('beforeinput', (e) => {
+          if (e.isTrusted) sawTrusted = true;
+        });
+
+        if (opts.syncFromDom) {
+          // How ProseMirror actually works: it lets the browser mutate the DOM
+          // and then reads the mutation back into its document. It only trusts
+          // mutations that arrived through a real input path.
+          el.addEventListener('input', (e) => {
+            if (opts.requireTrusted && !(sawTrusted || e.isTrusted)) return;
+            sawTrusted = false;
+            model.doc = el.tagName === 'TEXTAREA' ? el.value : el.innerText;
+            model.accepted.push('input');
+          });
+        }
+
+        if (opts.acceptPaste) {
+          el.addEventListener('paste', (e) => {
+            const text = e.clipboardData && e.clipboardData.getData('text/plain');
+            if (text == null) return;
+            e.preventDefault();
+            model.doc = text;
+            model.accepted.push('paste');
+            render(el, model.doc);
+          });
+        }
+
+        // The re-render loop. This is what discards writes that never reached
+        // the model, and it is the whole reason verification waits a frame.
+        function tick() {
+          const shown = el.tagName === 'TEXTAREA' ? el.value : el.innerText;
+          if (normalize(shown) !== normalize(model.doc)) render(el, model.doc);
+          requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      }
+
+      function normalize(s) {
+        return (s || '').replace(/\r\n?/g, '\n').replace(/ /g, ' ').replace(/[ \t]+$/gm, '').trim();
+      }
+
+      install('prosemirror', { syncFromDom: true, requireTrusted: true });
+      install('paste-only', { acceptPaste: true });
+      install('react-textarea', { syncFromDom: true, requireTrusted: false });
+      install('stubborn', {});
+      install('unfocusable', { syncFromDom: true, requireTrusted: true });
+
+      // Refuse focus, the way a composer inside an inert or aria-hidden
+      // container does.
+      const unfocusable = document.getElementById('unfocusable');
+      unfocusable.focus = function () {};
+      unfocusable.addEventListener('focus', (e) => e.target.blur(), true);
+    </script>
+  </body>
+</html>
