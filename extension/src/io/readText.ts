@@ -45,5 +45,26 @@ export function normalize(text: string): string {
     // Zero-width marks some editors use to keep empty nodes selectable.
     .replace(/[​‌﻿]/g, '')
     .replace(/[ \t]+$/gm, '')
+    /*
+     * Collapse runs of blank lines to a single paragraph break.
+     *
+     * A paragraph break inserted into a contenteditable becomes
+     * `<p>one</p><p><br></p><p>two</p>` — structurally exactly right, one empty
+     * paragraph between two full ones. But `innerText` serialises that as five
+     * newlines: one per block boundary, plus one for the `<br>`. Compared raw,
+     * a perfectly good write reads back as a mismatch, and the chain escalates
+     * through every remaining strategy before landing on "copied — paste it in"
+     * for text that is already sitting in the box.
+     *
+     * Found by the dev round-trip bar on a real build. The automated tests
+     * missed it because their 500-word probe was a single paragraph — chosen,
+     * at the time, specifically to avoid whitespace quirks.
+     *
+     * Applied to both sides, so it cannot mask a difference in wording, and a
+     * paragraph break flattened all the way to a line break is still a
+     * mismatch: section boundaries are the structure of a framework-shaped
+     * prompt, and losing them is a real failure.
+     */
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

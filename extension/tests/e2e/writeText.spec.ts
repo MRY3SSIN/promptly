@@ -19,6 +19,17 @@ const HARNESS = '/e2e/.build/harness.js';
 /** ~500 words, one paragraph — the size M2 has to survive. */
 const LONG_PROMPT = Array.from({ length: 500 }, (_, i) => `lorem-${i + 1}`).join(' ');
 
+/**
+ * The same length, but in paragraphs — which is what a framework-shaped prompt
+ * actually looks like, and what the single-paragraph probe above quietly failed
+ * to cover. A blank paragraph round-trips through `innerText` as a run of
+ * newlines, so this case fell through the entire fallback chain on a real build
+ * while every test passed.
+ */
+const LONG_PROMPT_PARAGRAPHS = Array.from({ length: 10 }, (_, block) =>
+  Array.from({ length: 50 }, (_, i) => `lorem-${block * 50 + i + 1}`).join(' '),
+).join('\n\n');
+
 async function boot(page: Page) {
   await page.goto(FIXTURE);
   await page.addScriptTag({ url: HARNESS });
@@ -56,6 +67,24 @@ test.describe('writeText', () => {
 
     expect(await model(page, 'prosemirror')).toBe(LONG_PROMPT);
     expect(await page.evaluate(() => window.__forgeIO.read('#prosemirror'))).toBe(LONG_PROMPT);
+  });
+
+  test('a multi-paragraph prompt verifies on the first strategy', async ({ page }) => {
+    const result = await page.evaluate(
+      (text) => window.__forgeIO.write('#prosemirror', text),
+      LONG_PROMPT_PARAGRAPHS,
+    );
+
+    // The point is not merely that it arrives — it is that verification
+    // recognises it as arrived. Falling back to the clipboard here would tell
+    // the user to paste text that is already in the box.
+    expect(result.strategy).toBe('exec-command');
+    expect(result.ok).toBe(true);
+    expect(result.attempts).toEqual(['exec-command']);
+
+    await page.waitForTimeout(300);
+    const kept = await model(page, 'prosemirror');
+    expect(kept?.split(/\n\s*\n/).length).toBe(10);
   });
 
   test('escalates to a synthetic paste when the editor ignores keyboard input', async ({ page }) => {

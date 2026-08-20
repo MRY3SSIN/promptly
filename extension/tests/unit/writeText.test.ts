@@ -307,7 +307,23 @@ describe('textMatches', () => {
     expect(textMatches('lorem-1 lorem-2', 'lorem-1 lorem-2 lorem-3')).toBe(false);
   });
 
-  it('preserves interior blank lines rather than collapsing them', () => {
+  it('preserves a paragraph break rather than collapsing it away', () => {
     expect(normalize('a\n\nb')).toBe('a\n\nb');
+  });
+
+  /**
+   * `innerText` emits a newline per block boundary *and* one for the `<br>`
+   * inside an empty paragraph, so a correctly structured paragraph break reads
+   * back as five newlines. Comparing raw sends a perfectly good write down the
+   * whole fallback chain and out the other side as "copied — paste it in".
+   */
+  it('accepts the newline inflation innerText applies to a blank paragraph', () => {
+    expect(textMatches('one\n\n\n\n\ntwo', 'one\n\ntwo')).toBe(true);
+  });
+
+  it('still rejects a paragraph break flattened into a line break', () => {
+    // Section boundaries are the structure of a framework-shaped prompt, so
+    // losing them is a real failure rather than a serialisation quirk.
+    expect(textMatches('one\ntwo', 'one\n\ntwo')).toBe(false);
   });
 });

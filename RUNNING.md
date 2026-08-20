@@ -70,6 +70,58 @@ Any of these gets you in:
 
 On Linux the equivalent toggle is **Ctrl+H**.
 
+## Updating to a newer build
+
+```bash
+cd promptly
+git pull
+cd extension
+pnpm install          # only needed when dependencies changed
+pnpm build
+```
+
+Then in `chrome://extensions`, click the **reload** icon on the Forge card.
+
+If a release added new sites — as M2 did — the manifest's host permissions
+change, and Chrome occasionally will not pick those up from a reload alone. If
+the widget appears on Claude but not on a newly added site, **Remove** the
+extension and **Load unpacked** again.
+
+## Testing the editor round-trip (development build)
+
+`writeText` is the part most likely to break as sites change, so there is a
+dev-only bar for exercising it against the real thing. It is stripped from
+production builds, and `pnpm dev` would launch a throwaway Chrome profile that
+is not signed in to anything — so build a static development bundle instead and
+load it into the browser you already use:
+
+```bash
+pnpm build:dev        # → .output/chrome-mv3-dev
+```
+
+Load `extension/.output/chrome-mv3-dev` unpacked (same hidden-folder caveat as
+above). On any supported site, focus the composer and a dashed bar appears
+under the halo. Click **insert 500w** and it reports:
+
+```
+prosemirror · exec-command · ok
+```
+
+which is `engine · winning strategy · verified`. What to look for:
+
+- **`ok`** — the text reached the editor's document model, not just its pixels.
+  Press Enter afterwards: the full 500 words should send.
+- **the strategy name** — `exec-command` on a contenteditable and
+  `value-setter` on a textarea are the healthy answers. Seeing
+  `synthetic-paste` or `input-events` instead means that site has changed how
+  it accepts input and the first strategy stopped working — worth reporting
+  even though the write still succeeded.
+- **`clipboard-fallback` / `MISMATCH`** — nothing reached the editor. The text
+  is on your clipboard and the toast says so.
+
+Load the two builds one at a time. Chrome will happily run both and you will get
+two halos.
+
 ## 4. See it working
 
 Go to **claude.ai** and click into the message box.
