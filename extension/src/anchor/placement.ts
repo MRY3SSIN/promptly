@@ -22,6 +22,11 @@ export interface Placement {
   corner: AnchorCorner;
   visible: boolean;
   reason: PlacementReason;
+  /**
+   * Whether the widget is currently held clear of the site's own controls.
+   * Fed back in on the next frame; see `slideClearOfAvoidZones`.
+   */
+  slid: boolean;
 }
 
 export interface PlacementInput {
@@ -36,10 +41,24 @@ export interface PlacementInput {
   /** Composer's clipping ancestors, already intersected with the viewport. */
   clip: Box;
   viewport: Box;
+  /** Previous frame's slide state, which makes the decision hysteretic. */
+  slid?: boolean;
 }
 
 /** Breathing room left between us and one of the site's own buttons. */
 const AVOID_GAP_PX = 8;
+
+/**
+ * How far clear of a control the widget must get before it stops dodging it.
+ *
+ * Engaging the slide costs a ~60px sideways move, so the decision cannot be a
+ * bare threshold: the widget rests only a few pixels above Claude's send
+ * button, and a threshold that close oscillates on layout noise — the widget
+ * hops the width of the control row and back while nothing the user did has
+ * changed. Requiring clear separation to disengage makes the decision sticky
+ * in one direction and turns the oscillation into a single transition.
+ */
+const AVOID_RELEASE_PX = 12;
 
 /** Keep the widget off the literal edge of the screen. */
 const VIEWPORT_MARGIN_PX = 4;
@@ -50,11 +69,14 @@ export const HIDDEN_PLACEMENT: Placement = {
   corner: 'bottom-right',
   visible: false,
   reason: 'no-target',
+  slid: false,
 };
 
 export function solvePlacement(input: PlacementInput): Placement {
   const { target, widget, spec, clip, viewport } = input;
   const corner = input.corner ?? spec.corner;
+
+  const wasSlid = input.slid ?? false;
 
   if (area(target) === 0) {
     return { ...HIDDEN_PLACEMENT, corner, reason: 'target-empty' };
@@ -75,7 +97,7 @@ export function solvePlacement(input: PlacementInput): Placement {
    */
   const visible = intersect(target, clip);
   if (visible.height < MIN_TARGET_VISIBLE_PX || visible.width < MIN_TARGET_VISIBLE_PX) {
-    return { x: 0, y: 0, corner, visible: false, reason: 'clipped' };
+    return { x: 0, y: 0, corner, visible: false, reason: 'clipped', slid: wasSlid };
   }
 
   let x = visible.x + visible.width - widget.width + spec.offset.x;
@@ -101,7 +123,9 @@ export function solvePlacement(input: PlacementInput): Placement {
    * pathologically narrow one.
    */
   x = clamp(x, visible.x, visible.x + Math.max(visible.width, widget.width) - widget.width);
-  x = slideClearOfAvoidZones(x, y, widget, input.avoid ?? []);
+
+  const slide = slideClearOfAvoidZones(x, y, widget, input.avoid ?? [], wasSlid);
+  x = slide.x;
 
   /*
    * Final nudge: never let a rounding error or an extreme offset push us off
@@ -118,36 +142,57 @@ export function solvePlacement(input: PlacementInput): Placement {
   x = clamp(x, viewport.x + VIEWPORT_MARGIN_PX, viewport.x + viewport.width - widget.width - VIEWPORT_MARGIN_PX);
   y = clamp(y, viewport.y + VIEWPORT_MARGIN_PX, viewport.y + viewport.height - widget.height - VIEWPORT_MARGIN_PX);
 
-  return { x, y, corner, visible: true, reason: 'ok' };
+  return { x, y, corner, visible: true, reason: 'ok', slid: slide.slid };
 }
 
 /**
  * Move left until we are clear of the site's own controls.
  *
- * Rightmost-first, so on a composer whose corner holds several stacked buttons
- * we step past all of them rather than hopping into the gap between two. The
- * loop is bounded by the number of avoid zones, so a pathological layout costs
- * a few extra comparisons, not a hang.
+ * Two stages, and the split is the point.
+ *
+ * *Whether* to dodge is decided against the widget's undisplaced position —
+ * where it would sit with no slide at all — with a release margin that applies
+ * only once it is already dodging. Testing against the displaced position
+ * instead would be a feedback loop: having moved 60px left, the widget no
+ * longer overlaps the button, so it would move back, overlap again, and
+ * oscillate every frame. The undisplaced position is a plain function of the
+ * composer's rect, so the decision has nowhere to feed back from.
+ *
+ * *How far* to dodge is then a straightforward walk, rightmost zone first, so
+ * a corner holding several stacked buttons is cleared in one move rather than
+ * landing in the gap between two of them.
  */
 function slideClearOfAvoidZones(
   x: number,
   y: number,
   widget: { width: number; height: number },
   avoid: readonly Box[],
-): number {
-  if (avoid.length === 0) return x;
+  wasSlid: boolean,
+): { x: number; slid: boolean } {
+  const zones = [...avoid].filter((box) => area(box) > 0).sort((a, b) => b.x - a.x);
+  if (zones.length === 0) return { x, slid: false };
 
-  const sorted = [...avoid].filter((box) => area(box) > 0).sort((a, b) => b.x - a.x);
+  const undisplaced: Box = { x, y, width: widget.width, height: widget.height };
+  // Already dodging: hold on until there is real separation, not a pixel of it.
+  const margin = wasSlid ? AVOID_RELEASE_PX : 0;
+  const engaged = zones.some((zone) => overlaps(undisplaced, inflate(zone, margin)));
+  if (!engaged) return { x, slid: false };
+
   let result = x;
-
-  for (const zone of sorted) {
+  for (const zone of zones) {
     const candidate: Box = { x: result, y, width: widget.width, height: widget.height };
     if (overlaps(candidate, zone)) {
       result = zone.x - widget.width - AVOID_GAP_PX;
     }
   }
 
-  return result;
+  return { x: result, slid: true };
+}
+
+/** Grow a box by `by` on every side. */
+function inflate(box: Box, by: number): Box {
+  if (by === 0) return box;
+  return { x: box.x - by, y: box.y - by, width: box.width + by * 2, height: box.height + by * 2 };
 }
 
 /** The point we hit-test for occlusion: the middle of the widget. */

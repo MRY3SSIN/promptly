@@ -457,6 +457,10 @@ export class AnchorEngine {
       avoid,
       clip,
       viewport,
+      // Feeding the previous frame's slide state back is what makes dodging
+      // the site's controls hysteretic rather than a bare threshold the widget
+      // can chatter across.
+      slid: this.#lastPlacement.slid,
     });
 
     placement = this.#applyOcclusion(placement, target, {
@@ -491,6 +495,7 @@ export class AnchorEngine {
       geometryUnchanged &&
       placement.visible === this.#lastPlacement.visible &&
       placement.corner === this.#lastPlacement.corner &&
+      placement.slid === this.#lastPlacement.slid &&
       samePosition(this.#lastPlacement, placement, POSITION_EPSILON_PX)
     ) {
       return;
@@ -565,6 +570,7 @@ export class AnchorEngine {
       avoid: ctx.avoid,
       clip: ctx.clip,
       viewport: ctx.viewport,
+      slid: placement.slid,
     });
 
     if (

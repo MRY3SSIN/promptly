@@ -13,6 +13,14 @@ const spec = (over: Partial<AnchorSpec> = {}): AnchorSpec => ({
   ...over,
 });
 
+/** Inclusive numeric range with a fractional step, for threshold walks. */
+function range(from: number, to: number, step: number): number[] {
+  const out: number[] = [];
+  const count = Math.round(Math.abs(to - from) / Math.abs(step));
+  for (let i = 0; i <= count; i++) out.push(from + i * step);
+  return out;
+}
+
 /** A typical single-line composer, comfortably inside the viewport. */
 const COMPOSER: Box = { x: 273, y: 620, width: 734, height: 24 };
 
@@ -125,6 +133,69 @@ describe('solvePlacement', () => {
       expect(withZone.x).toBe(without.x);
     });
 
+    /*
+     * The defect this pins down showed up as an intermittent 62px jump in the
+     * anchoring soak, roughly one run in fifteen — the width of Claude's
+     * control row.
+     *
+     * The overlap test is a threshold, and the widget rests close to it: a few
+     * pixels of vertical clearance between its bottom edge and the top of the
+     * send button. Any layout change that closes that gap flips the slide on,
+     * and the next one flips it back. A plain threshold makes that a hard
+     * oscillation, so the widget jumps back and forth by the width of the
+     * button row while the geometry jitters across the boundary by a pixel.
+     *
+     * Walking the composer across the boundary and back is deterministic where
+     * the soak was not, and asserts the property that actually matters: the
+     * position must be monotonic in the geometry, never oscillating.
+     */
+    it('does not oscillate when geometry drifts across the overlap threshold', () => {
+      const button: Box = { x: 960, y: 640, width: 30, height: 30 };
+      const positions: number[] = [];
+      let slid = false;
+
+      // Creep the composer down so the widget's lower edge crosses the
+      // button's upper edge a fraction of a pixel at a time, then creep back.
+      const steps = [...range(0, 12, 0.5), ...range(12, 0, -0.5)];
+      for (const dy of steps) {
+        const p = solvePlacement({
+          target: { ...COMPOSER, y: 620 + dy }, widget: WIDGET, spec: spec(),
+          avoid: [button], slid, clip: VIEWPORT, viewport: VIEWPORT,
+        });
+        slid = p.slid;
+        positions.push(p.x);
+      }
+
+      const transitions = positions.filter((x, i) => i > 0 && x !== positions[i - 1]).length;
+      expect(transitions).toBeLessThanOrEqual(2);
+    });
+
+    it('holds the slide once engaged, rather than releasing on a one-pixel retreat', () => {
+      const button: Box = { x: 960, y: 634, width: 30, height: 30 };
+      const engaged = solvePlacement({
+        target: { ...COMPOSER, y: 630 }, widget: WIDGET, spec: spec(),
+        avoid: [button], slid: false, clip: VIEWPORT, viewport: VIEWPORT,
+      });
+      expect(engaged.slid).toBe(true);
+
+      // One pixel back the way it came must not undo a 60px move.
+      const nudged = solvePlacement({
+        target: { ...COMPOSER, y: 629 }, widget: WIDGET, spec: spec(),
+        avoid: [button], slid: true, clip: VIEWPORT, viewport: VIEWPORT,
+      });
+      expect(nudged.slid).toBe(true);
+      expect(nudged.x).toBe(engaged.x);
+    });
+
+    it('releases the slide once the control is clearly out of the way', () => {
+      const button: Box = { x: 960, y: 634, width: 30, height: 30 };
+      const released = solvePlacement({
+        target: { ...COMPOSER, y: 560 }, widget: WIDGET, spec: spec(),
+        avoid: [button], slid: true, clip: VIEWPORT, viewport: VIEWPORT,
+      });
+      expect(released.slid).toBe(false);
+    });
+
     it('ignores zero-area zones from controls the site has hidden', () => {
       const hidden: Box = { x: 960, y: 618, width: 0, height: 0 };
       const p = solvePlacement({
@@ -161,7 +232,7 @@ describe('solvePlacement', () => {
 
 describe('centerOf', () => {
   it('returns the hit-test point at the widget centre', () => {
-    expect(centerOf({ x: 100, y: 200, corner: 'bottom-right', visible: true, reason: 'ok' }, WIDGET))
+    expect(centerOf({ x: 100, y: 200, corner: 'bottom-right', visible: true, reason: 'ok', slid: false }, WIDGET))
       .toEqual({ x: 111, y: 211 });
   });
 });
